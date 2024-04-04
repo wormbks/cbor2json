@@ -1,17 +1,16 @@
-# CSD (CBOR Stream Decoder)
+# CBOR to JSON converter ( former CBOR Stream Decoder)
 
 This updated version CBOR Stream Decoder with float16 support.
 
-CSD decodes a stream of CBOR bytes into JSON. CBOR stream could be copressed by gzip.
+`cbor2json` decodes a stream of CBOR bytes into JSON. CBOR stream could be copressed by gzip.
+
 ``` sh
 Usage:
 
-    csd [-in inputFile] [-out outputFile] [-follow]
+    cbor2json [-in inputFile] [-out outputFile] [-follow]
 
 Run `csd -h` for a list of supported options and usage.
-
 If `-in` is omitted, csd reads from stdin.
-
 If `-out` is omitted, csd writes to stdout.
 
 ```
@@ -46,10 +45,6 @@ Input from file, output to file
     ...
 
 
-
-## APIs
-
-For documentation of APIs used to decode, see: https://godoc.org/github.com/toravir/csd/libs/
 
 ## Limitations
 
