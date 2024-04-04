@@ -70,6 +70,10 @@ var IntegerTimeFieldFormat = time.RFC3339
 // from a float value (time in seconds and nano seconds).
 var NanoTimeFieldFormat = time.RFC3339Nano
 
+// appendCborTypePrefix appends the CBOR type prefix to the given byte slice.
+// The prefix consists of the major type byte and the additional type byte,
+// followed by the encoded value. The number of bytes used to encode the value
+// depends on its size.
 func appendCborTypePrefix(dst []byte, major byte, number uint64) []byte {
 	byteCount := 8
 	var minor byte

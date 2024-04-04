@@ -1,18 +1,12 @@
-# csd (CBOR Stream Decoder)
+# CSD (CBOR Stream Decoder)
 
-[![PkgGoDev](https://pkg.go.dev/badge/github.com/toravir/csd/libs)](https://pkg.go.dev/github.com/toravir/csd/libs) [![godoc](http://img.shields.io/badge/godoc-reference-blue.svg?style=flat)](https://godoc.org/github.com/toravir/csd/libs/) [![license](http://img.shields.io/badge/license-MIT-red.svg?style=flat)](https://raw.githubusercontent.com/toravir/csd/master/LICENSE) [![Build Status](https://travis-ci.org/toravir/csd.svg?branch=master)](https://travis-ci.org/toravir/csd)
+This updated version CBOR Stream Decoder with float16 support.
 
-CBOR Stream Decoder
-
-CSD decodes a stream of CBOR bytes into JSON.
-
+CSD decodes a stream of CBOR bytes into JSON. CBOR stream could be copressed by gzip.
+``` sh
 Usage:
 
-    csd [-in inputFile] [-out outputFile] [-compress] [-follow]
-
-Use `-compress` if the input is a zlib compressed data - csd will uncompress and decode
-
-Use `-follow` to continually monitor inputFile for new bytes and decode as they are written to the file
+    csd [-in inputFile] [-out outputFile] [-follow]
 
 Run `csd -h` for a list of supported options and usage.
 
@@ -20,6 +14,7 @@ If `-in` is omitted, csd reads from stdin.
 
 If `-out` is omitted, csd writes to stdout.
 
+```
 
 ## Example
 
@@ -51,11 +46,6 @@ Input from file, output to file
     ...
 
 
-## Download/Install
-
-The easiest way to install is to run `go get -u github.com/toravir/csd`. You could also manually
-git clone the repository and do a `go build`.
-
 
 ## APIs
 
@@ -63,6 +53,6 @@ For documentation of APIs used to decode, see: https://godoc.org/github.com/tora
 
 ## Limitations
 
-The input is expected to be CBOR data (either zlib-compressed or not). It is NOT possible to
+The input is expected to be CBOR data (either gzib-compressed or not). It is NOT possible to
 detect JSON (text) output reliably since binary format spans over JSON character set also.
 

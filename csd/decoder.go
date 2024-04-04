@@ -14,6 +14,8 @@ import (
 	"strings"
 	"time"
 	"unicode/utf8"
+
+	"github.com/x448/float16"
 )
 
 // DecodeTimeZone - set this variable if a specific TZ should be
@@ -23,6 +25,7 @@ var DecodeTimeZone *time.Location
 
 const hexTable = "0123456789abcdef"
 
+const isFloat16 = 2
 const isFloat32 = 4
 const isFloat64 = 8
 
@@ -52,7 +55,7 @@ func readNBytes(src *bufio.Reader, n int) []byte {
 	for i := 0; i < n; i++ {
 		ch, e := src.ReadByte()
 		if e != nil {
-			panic(fmt.Errorf("Tried to Read %d Bytes.. But hit end of file", n))
+			panic(fmt.Errorf("tried to Read %d Bytes.. But hit end of file", n))
 		}
 		ret[i] = ch
 	}
@@ -62,7 +65,7 @@ func readNBytes(src *bufio.Reader, n int) []byte {
 func readByte(src *bufio.Reader) byte {
 	b, e := src.ReadByte()
 	if e != nil {
-		panic(fmt.Errorf("Tried to Read 1 Byte.. But hit end of file"))
+		panic(fmt.Errorf("tried to Read 1 Byte.. But hit end of file"))
 	}
 	return b
 }
@@ -83,7 +86,7 @@ func decodeIntAdditonalType(src *bufio.Reader, minor byte) int64 {
 		case additionalTypeIntUint64:
 			bytesToRead = 8
 		default:
-			panic(fmt.Errorf("Invalid Additional Type: %d in decodeInteger (expected <28)", minor))
+			panic(fmt.Errorf("invalid Additional Type: %d in decodeInteger (expected <28)", minor))
 		}
 		pb := readNBytes(src, bytesToRead)
 		for i := 0; i < bytesToRead; i++ {
@@ -94,12 +97,15 @@ func decodeIntAdditonalType(src *bufio.Reader, minor byte) int64 {
 	return val
 }
 
+// decodeInteger reads an integer value from the given bufio.Reader.
+// The integer value is encoded using the CBOR additional integer types, which
+// can represent integers of varying sizes up to 64 bits.
 func decodeInteger(src *bufio.Reader) int64 {
 	pb := readByte(src)
 	major := pb & maskOutAdditionalType
 	minor := pb & maskOutMajorType
 	if major != majorTypeUnsignedInt && major != majorTypeNegativeInt {
-		panic(fmt.Errorf("Major type is: %d in decodeInteger!! (expected 0 or 1)", major))
+		panic(fmt.Errorf("major type is: %d in decodeInteger!! (expected 0 or 1)", major))
 	}
 	val := decodeIntAdditonalType(src, minor)
 	if major == 0 {
@@ -113,12 +119,20 @@ func decodeFloat(src *bufio.Reader) (float64, int) {
 	major := pb & maskOutAdditionalType
 	minor := pb & maskOutMajorType
 	if major != majorTypeSimpleAndFloat {
-		panic(fmt.Errorf("Incorrect Major type is: %d in decodeFloat", major))
+		panic(fmt.Errorf("incorrect Major type is: %d in decodeFloat", major))
 	}
 
 	switch minor {
 	case additionalTypeFloat16:
-		panic(fmt.Errorf("float16 is not suppported in decodeFloat"))
+		//panic(fmt.Errorf("float16 is not suppported in decodeFloat"))
+		pb := readNBytes(src, 2)
+		n := uint16(0)
+		for i := 0; i < 2; i++ {
+			n = n * 256
+			n += uint16(pb[i])
+		}
+		f16 := float16.Frombits(n)
+		return float64(f16.Float32()), isFloat16
 
 	case additionalTypeFloat32:
 		pb := readNBytes(src, 4)
@@ -155,9 +169,12 @@ func decodeFloat(src *bufio.Reader) (float64, int) {
 		val := math.Float64frombits(n)
 		return val, isFloat64
 	}
-	panic(fmt.Errorf("Invalid Additional Type: %d in decodeFloat", minor))
+	panic(fmt.Errorf("invalid Additional Type: %d in decodeFloat", minor))
 }
 
+// decodeStringComplex decodes a string from the input string, handling complex
+// characters that need to be escaped. It appends the decoded string to the
+// provided byte slice and returns the updated slice.
 func decodeStringComplex(dst []byte, s string, pos uint) []byte {
 	i := int(pos)
 	start := 0
@@ -217,12 +234,15 @@ func decodeStringComplex(dst []byte, s string, pos uint) []byte {
 	return dst
 }
 
+// decodeString decodes a CBOR-encoded byte string from the given bufio.Reader.
+// If noQuotes is true, the resulting byte slice will not include the surrounding quotes.
+// Otherwise, the resulting byte slice will include the surrounding quotes.
 func decodeString(src *bufio.Reader, noQuotes bool) []byte {
 	pb := readByte(src)
 	major := pb & maskOutAdditionalType
 	minor := pb & maskOutMajorType
 	if major != majorTypeByteString {
-		panic(fmt.Errorf("Major type is: %d in decodeString", major))
+		panic(fmt.Errorf("major type is: %d in decodeString", major))
 	}
 	result := []byte{}
 	if !noQuotes {
@@ -243,7 +263,7 @@ func decodeUTF8String(src *bufio.Reader) []byte {
 	major := pb & maskOutAdditionalType
 	minor := pb & maskOutMajorType
 	if major != majorTypeUtf8String {
-		panic(fmt.Errorf("Major type is: %d in decodeUTF8String", major))
+		panic(fmt.Errorf("major type is: %d in decodeUTF8String", major))
 	}
 	result := []byte{'"'}
 	length := decodeIntAdditonalType(src, minor)
@@ -274,7 +294,7 @@ func array2Json(src *bufio.Reader, dst io.Writer) {
 	major := pb & maskOutAdditionalType
 	minor := pb & maskOutMajorType
 	if major != majorTypeArray {
-		panic(fmt.Errorf("Major type is: %d in array2Json", major))
+		panic(fmt.Errorf("major type is: %d in array2Json", major))
 	}
 	len := 0
 	unSpecifiedCount := false
@@ -318,7 +338,7 @@ func map2Json(src *bufio.Reader, dst io.Writer) {
 	major := pb & maskOutAdditionalType
 	minor := pb & maskOutMajorType
 	if major != majorTypeMap {
-		panic(fmt.Errorf("Major type is: %d in map2Json", major))
+		panic(fmt.Errorf("major type is: %d in map2Json", major))
 	}
 	len := 0
 	unSpecifiedCount := false
@@ -368,7 +388,7 @@ func decodeTagData(src *bufio.Reader) []byte {
 	major := pb & maskOutAdditionalType
 	minor := pb & maskOutMajorType
 	if major != majorTypeTags {
-		panic(fmt.Errorf("Major type is: %d in decodeTagData", major))
+		panic(fmt.Errorf("major type is: %d in decodeTagData", major))
 	}
 	switch minor {
 	case additionalTypeTimestamp:
@@ -383,7 +403,7 @@ func decodeTagData(src *bufio.Reader) []byte {
 			pb := readByte(src)
 			dataMajor := pb & maskOutAdditionalType
 			if dataMajor != majorTypeByteString {
-				panic(fmt.Errorf("Unsupported embedded Type: %d in decodeEmbeddedJSON", dataMajor))
+				panic(fmt.Errorf("unsupported embedded Type: %d in decodeEmbeddedJSON", dataMajor))
 			}
 			src.UnreadByte()
 			return decodeString(src, true)
@@ -401,7 +421,7 @@ func decodeTagData(src *bufio.Reader) []byte {
 				ip := net.IP(octets)
 				ss = append(append(ss, ip.String()...), '"')
 			default:
-				panic(fmt.Errorf("Unexpected Network Address length: %d (expected 4,6,16)", len(octets)))
+				panic(fmt.Errorf("unexpected Network Address length: %d (expected 4,6,16)", len(octets)))
 			}
 			return ss
 
@@ -434,10 +454,10 @@ func decodeTagData(src *bufio.Reader) []byte {
 			return append(ss, '"')
 
 		default:
-			panic(fmt.Errorf("Unsupported Additional Tag Type: %d in decodeTagData", val))
+			panic(fmt.Errorf("unsupported Additional Tag Type: %d in decodeTagData", val))
 		}
 	}
-	panic(fmt.Errorf("Unsupported Additional Type: %d in decodeTagData", minor))
+	panic(fmt.Errorf("unsupported Additional Type: %d in decodeTagData", minor))
 }
 
 func decodeTimeStamp(src *bufio.Reader) []byte {
@@ -474,7 +494,7 @@ func decodeTimeStamp(src *bufio.Reader) []byte {
 		tsb = append(tsb, '"')
 		return tsb
 	}
-	panic(fmt.Errorf("TS format is neigther int nor float: %d", tsMajor))
+	panic(fmt.Errorf("format is neigther int nor float: %d", tsMajor))
 }
 
 func decodeSimpleFloat(src *bufio.Reader) []byte {
@@ -482,7 +502,7 @@ func decodeSimpleFloat(src *bufio.Reader) []byte {
 	major := pb & maskOutAdditionalType
 	minor := pb & maskOutMajorType
 	if major != majorTypeSimpleAndFloat {
-		panic(fmt.Errorf("Major type is: %d in decodeSimpleFloat", major))
+		panic(fmt.Errorf("major type is: %d in decodeSimpleFloat", major))
 	}
 	switch minor {
 	case additionalTypeBoolTrue:
@@ -507,19 +527,33 @@ func decodeSimpleFloat(src *bufio.Reader) []byte {
 		case math.IsInf(v, -1):
 			return []byte("\"-Inf\"")
 		}
-		if bc == isFloat32 {
+		if bc == isFloat32 || bc == isFloat16 {
 			ba = strconv.AppendFloat(ba, v, 'f', -1, 32)
 		} else if bc == isFloat64 {
 			ba = strconv.AppendFloat(ba, v, 'f', -1, 64)
 		} else {
-			panic(fmt.Errorf("Invalid Float precision from decodeFloat: %d", bc))
+			panic(fmt.Errorf("invalid Float precision from decodeFloat: %d", bc))
 		}
 		return ba
 	default:
-		panic(fmt.Errorf("Invalid Additional Type: %d in decodeSimpleFloat", minor))
+		panic(fmt.Errorf("invalid Additional Type: %d in decodeSimpleFloat", minor))
 	}
 }
 
+// cbor2JsonOneObject decodes a single CBOR-encoded object and writes the corresponding JSON representation to the provided io.Writer.
+//
+// The function reads the first byte from the input bufio.Reader to determine the major type of the CBOR data. It then dispatches to
+// the appropriate decoding function based on the major type:
+//
+// - majorTypeUnsignedInt and majorTypeNegativeInt: decodes an integer value and writes it as a JSON number.
+// - majorTypeByteString: decodes a byte string and writes it as a JSON string.
+// - majorTypeUtf8String: decodes a UTF-8 string and writes it as a JSON string.
+// - majorTypeArray: decodes an array and writes it as a JSON array.
+// - majorTypeMap: decodes a map and writes it as a JSON object.
+// - majorTypeTags: decodes a tagged value and writes it as a JSON value.
+// - majorTypeSimpleAndFloat: decodes a simple value (e.g. true, false, null) or a floating-point number and writes it as the corresponding JSON value.
+//
+// If an error occurs during decoding, the function will panic with the error.
 func cbor2JsonOneObject(src *bufio.Reader, dst io.Writer) {
 	pb, e := src.Peek(1)
 	if e != nil {

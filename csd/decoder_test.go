@@ -225,6 +225,27 @@ func TestDecodeBool(t *testing.T) {
 	}
 }
 
+func TestDecodeFloat16(t *testing.T) {
+	var float16TestCases = []struct {
+		val    string
+		binary string
+	}{
+		{"0", "\xf9\x00\x00"},
+		{"1", "\xf9\x3c\x00"},
+		{"1.5", "\xf9\x3e\x00"},
+		{"65504", "\xf9\x7b\xff"},
+		{"-4", "\xf9\xc4\x00"},
+		{"0.000061035156", "\xf9\x04\x00"},
+	}
+
+	for _, tc := range float16TestCases {
+		got := decodeSimpleFloat(getReader(tc.binary))
+		if string(got) != tc.val {
+			t.Errorf("decodeSimpleFloat(0x%s)=%s, want:%s\n", hex.EncodeToString([]byte(tc.binary)), got, tc.val)
+		}
+	}
+}
+
 func TestDecodeFloat(t *testing.T) {
 	var float32TestCases = []struct {
 		val    string
@@ -365,13 +386,13 @@ var negativeCborTestCases = []struct {
 	binary []byte
 	errStr string
 }{
-	{[]byte("\xb9\x64IETF\x20\x65Array\x9f\x20\x00\x18\xc8\x14"), "Tried to Read 18 Bytes.. But hit end of file"},
+	{[]byte("\xb9\x64IETF\x20\x65Array\x9f\x20\x00\x18\xc8\x14"), "tried to Read 18 Bytes.. But hit end of file"},
 	{[]byte("\xbf\x64IETF\x20\x65Array\x9f\x20\x00\x18\xc8\x14"), "EOF"},
-	{[]byte("\xbf\x14IETF\x20\x65Array\x9f\x20\x00\x18\xc8\x14"), "Tried to Read 40736 Bytes.. But hit end of file"},
+	{[]byte("\xbf\x14IETF\x20\x65Array\x9f\x20\x00\x18\xc8\x14"), "tried to Read 40736 Bytes.. But hit end of file"},
 	{[]byte("\xbf\x64IETF"), "EOF"},
-	{[]byte("\xbf\x64IETF\x20\x65Array\x9f\x20\x00\x18\xc8\xff\xff\xff"), "Invalid Additional Type: 31 in decodeSimpleFloat"},
+	{[]byte("\xbf\x64IETF\x20\x65Array\x9f\x20\x00\x18\xc8\xff\xff\xff"), "invalid Additional Type: 31 in decodeSimpleFloat"},
 	{[]byte("\xbf\x64IETF\x20\x65Array"), "EOF"},
-	{[]byte("\xbf\x64"), "Tried to Read 4 Bytes.. But hit end of file"},
+	{[]byte("\xbf\x64"), "tried to Read 4 Bytes.. But hit end of file"},
 }
 
 func TestDecodeNegativeCbor2Json(t *testing.T) {
